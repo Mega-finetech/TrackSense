@@ -1,0 +1,337 @@
+/* ===========================================================
+   TRACKSENSE — DESIGN SYSTEM (Tailwind v4, CSS-first)
+   Brand: Deep Navy + Electric Cyan · 2026 "calm glass" language
+   =========================================================== */
+
+@import 'tailwindcss';
+
+/* Dark mode driven by .dark class on <html> (ThemeContext) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* -----------------------------------------------------------
+   1. BRAND PALETTES (static scales → bg-cyan-500, text-navy-900…)
+   ----------------------------------------------------------- */
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Navy — primary dark surfaces */
+  --color-navy-950: #050D18;
+  --color-navy-900: #0A1628;
+  --color-navy-850: #0C1D33;
+  --color-navy-800: #0F2440;
+  --color-navy-700: #16304F;
+  --color-navy-600: #1E3E63;
+  --color-navy-500: #2A5078;
+  --color-navy-400: #4A6B90;
+  --color-navy-300: #7A94AE;
+  --color-navy-200: #A9BCCE;
+  --color-navy-100: #D3DEE9;
+  --color-navy-50:  #EEF3F8;
+
+  /* Cyan — brand accent */
+  --color-cyan-50:  #ECFBFF;
+  --color-cyan-100: #D0F4FD;
+  --color-cyan-200: #A3E9FA;
+  --color-cyan-300: #6DDAF5;
+  --color-cyan-400: #33C6EA;
+  --color-cyan-500: #00B4D8;
+  --color-cyan-600: #0090B0;
+  --color-cyan-700: #00708A;
+  --color-cyan-800: #005366;
+  --color-cyan-900: #06323F;
+
+  /* Accent hues used across modules */
+  --color-violet-brand: #8B5CF6;
+  --color-amber-brand:  #F59E0B;
+  --color-emerald-brand:#10B981;
+  --color-rose-brand:   #F43F5E;
+
+  /* Radii */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
+  --radius-3xl: 32px;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgb(10 22 40 / 0.04), 0 4px 16px -2px rgb(10 22 40 / 0.06);
+  --shadow-lift: 0 2px 4px rgb(10 22 40 / 0.05), 0 12px 32px -8px rgb(10 22 40 / 0.14);
+  --shadow-float: 0 24px 64px -16px rgb(10 22 40 / 0.28);
+  --shadow-glow: 0 8px 24px -6px rgb(0 180 216 / 0.45);
+
+  /* Motion */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-fade-up: fade-up 0.45s var(--ease-out-soft) both;
+  --animate-fade-in: fade-in 0.3s ease both;
+  --animate-scale-in: scale-in 0.28s var(--ease-spring) both;
+  --animate-slide-up: slide-up 0.35s var(--ease-out-soft) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-pulse-ring: pulse-ring 2s ease-out infinite;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgb(0 180 216 / 0.35); }
+  70%  { box-shadow: 0 0 0 10px rgb(0 180 216 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(0 180 216 / 0); }
+}
+
+/* -----------------------------------------------------------
+   2. SEMANTIC TOKENS (theme-aware via CSS vars)
+   ----------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  --ts-bg:         #F5F7FA;
+  --ts-card:       #FFFFFF;
+  --ts-card-muted: #F0F4F8;
+  --ts-border:     #E6EDF4;
+  --ts-text:       #0A1628;
+  --ts-text-soft:  #46607E;
+  --ts-text-mute:  #8698AB;
+  --ts-accent:     #00B4D8;
+  --ts-accent-soft:#E0F7FC;
+  --ts-overlay:    rgb(6 13 24 / 0.45);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --ts-bg:         #060D18;
+  --ts-card:       #0C1D33;
+  --ts-card-muted: #12253E;
+  --ts-border:     #1B3050;
+  --ts-text:       #EEF4FA;
+  --ts-text-soft:  #A9BCCE;
+  --ts-text-mute:  #64798F;
+  --ts-accent:     #33C6EA;
+  --ts-accent-soft:#0D2A44;
+  --ts-overlay:    rgb(2 6 12 / 0.65);
+}
+
+/* Expose semantic tokens to Tailwind utilities.
+   `inline` makes generated utilities reference the var directly,
+   so bg-surface etc. automatically follow the .dark class. */
+@theme inline {
+  --color-surface:      var(--ts-bg);
+  --color-card:         var(--ts-card);
+  --color-card-muted:   var(--ts-card-muted);
+  --color-line:         var(--ts-border);
+  --color-ink:          var(--ts-text);
+  --color-ink-soft:     var(--ts-text-soft);
+  --color-ink-mute:     var(--ts-text-mute);
+  --color-accent:       var(--ts-accent);
+  --color-accent-soft:  var(--ts-accent-soft);
+}
+
+/* -----------------------------------------------------------
+   3. BASE
+   ----------------------------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--ts-bg);
+  color: var(--ts-text);
+  overscroll-behavior-y: none;
+  overflow-x: hidden;
+  touch-action: manipulation;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: 16px; /* prevents iOS zoom-on-focus */
+  -webkit-appearance: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ts-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ts-border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ts-text-mute); }
+
+/* -----------------------------------------------------------
+   4. UTILITIES & COMPONENT CLASSES
+   ----------------------------------------------------------- */
+
+/* Frosted glass surfaces (nav bars, sheets, overlays) */
+@utility glass {
+  background: color-mix(in srgb, var(--ts-card) 78%, transparent);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+}
+
+@utility glass-dark {
+  background: rgb(10 22 40 / 0.72);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+
+/* Standard content card */
+@utility card-base {
+  background: var(--ts-card);
+  border: 1px solid var(--ts-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgb(10 22 40 / 0.04), 0 4px 16px -2px rgb(10 22 40 / 0.06);
+}
+
+/* Hide scrollbars but keep scrolling */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+/* Safe-area helpers */
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Bottom nav sizing consumed by layout JS/CSS */
+:root {
+  --bottom-nav-h: 68px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --bottom-nav-total: calc(var(--bottom-nav-h) + var(--safe-bottom));
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  border-radius: 12px;
+  background: linear-gradient(90deg,
+    var(--ts-card-muted) 25%,
+    color-mix(in srgb, var(--ts-card-muted) 60%, var(--ts-border)) 50%,
+    var(--ts-card-muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* Gradient headline text */
+.text-gradient {
+  background: linear-gradient(92deg, var(--color-cyan-400) 0%, var(--color-cyan-200) 55%, #FFFFFF 110%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.text-gradient-dark {
+  background: linear-gradient(92deg, var(--color-cyan-600) 0%, var(--color-cyan-400) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Aurora mesh backdrop for hero sections */
+.aurora {
+  position: relative;
+  isolation: isolate;
+}
+.aurora::before,
+.aurora::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  border-radius: 9999px;
+  filter: blur(80px);
+  pointer-events: none;
+}
+.aurora::before {
+  width: 420px; height: 420px;
+  top: -160px; right: -120px;
+  background: radial-gradient(circle, rgb(0 180 216 / 0.35), transparent 65%);
+}
+.aurora::after {
+  width: 360px; height: 360px;
+  bottom: -180px; left: -140px;
+  background: radial-gradient(circle, rgb(139 92 246 / 0.22), transparent 65%);
+}
+
+/* Legacy compat aliases (used by older pages) */
+.mobile-card {
+  background: var(--ts-card);
+  border: 1px solid var(--ts-border);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgb(10 22 40 / 0.04), 0 4px 16px -2px rgb(10 22 40 / 0.06);
+  overflow: hidden;
+}
+.page-enter-fade { animation: fade-in 0.25s ease both; }
+.page-enter { animation: fade-up 0.35s var(--ease-out-soft) both; }
+.divider { height: 1px; background: var(--ts-border); }
+.list-row { transition: background-color 150ms ease; }
+.list-row:active { background-color: var(--ts-accent-soft); }
+.scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-x::-webkit-scrollbar { display: none; }
+.overscroll-y {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.fab {
+  width: 56px; height: 56px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--color-cyan-400), var(--color-cyan-600));
+  color: white;
+  box-shadow: 0 8px 24px -6px rgb(0 180 216 / 0.5);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s var(--ease-spring), box-shadow 0.2s ease;
+}
+.fab:hover { transform: scale(1.06); }
+.fab:active { transform: scale(0.92); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
