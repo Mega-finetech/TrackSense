@@ -1,0 +1,86 @@
+﻿import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { Check, CheckSquare, ChevronLeft, ChevronRight, Plus } from 'lucide-react-native';
+import { useTheme } from '../../theme/ThemeProvider';
+import { TAB_BAR_CONTENT_GAP } from '../../components/tabBarMetrics';
+import { useTasks, useUpdateTask } from './queries';
+import { errorMessage } from '../../services/errors';
+import { Task } from '../../types';
+
+// The tab bar is in flow, so these offsets are measured from the top edge of the
+// bar rather than from the device screen. They are size constants, not device
+// measurements, so they hold on any screen size.
+const FAB_SIZE = 56;
+const FAB_GAP = TAB_BAR_CONTENT_GAP;
+const FAB_CLEARANCE = FAB_SIZE + FAB_GAP * 2;
+
+
+const dayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const taskDay = (task: Task) => task.due_date ? dayKey(new Date(task.due_date)) : 'No date';
+const isDone = (task: Task) => ['done', 'completed'].includes(task.status);
+function usePalette() {
+  const { dark } = useTheme();
+  return { dark, background: dark ? '#0A0F0D' : '#F8F9FA', card: dark ? '#111915' : '#FFFFFF', border: dark ? '#2D4A38' : '#E5E7EB', primary: dark ? '#52B788' : '#1B4332', onPrimary: dark ? '#0A0F0D' : '#FFFFFF', text: dark ? '#F0FDF4' : '#1A1A1A', secondary: dark ? '#86EFAC' : '#6B7280', muted: dark ? '#4B6E58' : '#9CA3AF', soft: dark ? '#1A2E22' : '#F3F4F6', chip: dark ? '#1A2E22' : '#F9FAFB', selected: dark ? '#1A2E22' : '#DCFCE7', column: dark ? '#0D1A12' : '#F8F9FA' };
+}
+function Badges({ task }: { task: Task }) {
+  const c = usePalette();
+  const high = ['high', 'urgent'].includes(task.priority);
+  const medium = task.priority === 'medium';
+  const background = high ? c.dark ? '#3B0000' : '#FEE2E2' : medium ? c.dark ? '#3B2500' : '#FEF3C7' : c.soft;
+  const color = high ? c.dark ? '#F87171' : '#DC2626' : medium ? c.dark ? '#FCD34D' : '#D97706' : c.secondary;
+  return <View style={styles.badges}><Text style={[styles.badge, { backgroundColor: background, color }]}>{task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}</Text><Text style={[styles.badge, { backgroundColor: c.chip, color: c.secondary }]}>{task.project_id ? 'Project' : task.goal_id ? 'Goal' : 'Personal'}</Text></View>;
+}
+function TaskItem({ task, busy, onToggle }: { task: Task; busy: boolean; onToggle: () => void }) {
+  const c = usePalette(); const done = isDone(task);
+  const overdue = !done && !!task.due_date && new Date(task.due_date).getTime() < Date.now();
+  return <View style={[styles.task, { backgroundColor: c.card, borderColor: c.border }]}>
+    <Pressable accessibilityRole="checkbox" accessibilityLabel={`Complete ${task.title}`} aria-checked={done} accessibilityState={{ checked: done, disabled: busy }} disabled={busy} onPress={onToggle} style={styles.checkTouch}><View style={[styles.checkbox, { borderColor: done ? c.primary : '#D1D5DB', backgroundColor: done ? c.primary : 'transparent' }]}>{done && <Check size={12} color={c.onPrimary} />}</View></Pressable>
+    <View style={styles.taskContent}><Text style={[styles.taskTitle, done && styles.done, { color: done ? c.muted : c.text }]}>{task.title}</Text><Badges task={task} /></View>
+    {!!task.due_date && <Text style={[styles.time, { color: overdue ? '#EF4444' : c.muted }]}>{new Date(task.due_date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</Text>}
+  </View>;
+}
+function EmptyTasks() { const c = usePalette(); return <View style={styles.empty}><CheckSquare size={48} color="#D1D5DB" /><Text style={[styles.emptyTitle, { color: c.secondary }]}>No tasks yet</Text><Text style={[styles.emptyDetail, { color: c.muted }]}>Tap + to add your first task</Text></View>; }
+function Skeletons() {
+  const c = usePalette(); const opacity = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => { const pulse = Animated.loop(Animated.sequence([Animated.timing(opacity, { toValue: 1, duration: 650, useNativeDriver: true }), Animated.timing(opacity, { toValue: 0.4, duration: 650, useNativeDriver: true })])); pulse.start(); return () => pulse.stop(); }, [opacity]);
+  return <View accessibilityLabel="Loading tasks">{[0, 1, 2].map(key => <Animated.View key={key} style={[styles.skeleton, { backgroundColor: c.soft, opacity }]} />)}</View>;
+}
+export default function TasksScreen() {
+  const [view, setView] = useState<'List' | 'Kanban' | 'Calendar'>('List');
+  const [filter, setFilter] = useState('Today');
+  const [selectedDay, setSelectedDay] = useState(dayKey(new Date()));
+  const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const c = usePalette();
+  const tasks = useTasks(); const update = useUpdateTask();
+  const items = tasks.data?.filter(task => task.status !== 'archived') || [];
+  const add = () => router.push('/task/new');
+  const toggle = (task: Task) => update.mutate({ id: task.id, status: isDone(task) ? 'todo' : 'done' });
+  const today = new Date(); const todayKey = dayKey(today);
+  const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (today.getDay() + 6) % 7);
+  const nextMonday = new Date(monday); nextMonday.setDate(monday.getDate() + 7);
+  const visible = items.filter(task => filter === 'All' || filter === 'Today' && taskDay(task) === todayKey || filter === 'This Week' && !!task.due_date && new Date(task.due_date) >= monday && new Date(task.due_date) < nextMonday);
+  const grouped = new Map<string, Task[]>();
+  [...visible].sort((a, b) => (a.due_date ? new Date(a.due_date).getTime() : Infinity) - (b.due_date ? new Date(b.due_date).getTime() : Infinity)).forEach(task => { const key = taskDay(task); grouped.set(key, [...(grouped.get(key) || []), task]); });
+  const sections = [...grouped].map(([title, data]) => ({ title, data }));
+  const dateTitle = (key: string) => key === 'No date' ? key : `${key === todayKey ? 'Today - ' : ''}${new Date(`${key}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}`;
+  const columns = [{ title: 'To Do', statuses: ['todo', 'pending'] }, { title: 'In Progress', statuses: ['in_progress', 'started'] }, { title: 'Done', statuses: ['done', 'completed'] }];
+  const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const offset = (month.getDay() + 6) % 7;
+  return <SafeAreaView edges={['top', 'left', 'right']} style={[styles.screen, { backgroundColor: c.background }]}>
+    <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="Back to home" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={styles.back}><ChevronLeft size={24} color={c.text} /></Pressable><Text accessibilityRole="header" style={[styles.heading, { color: c.text }]}>Tasks</Text><Pressable accessibilityRole="button" accessibilityLabel="Add task" hitSlop={4} onPress={add} style={[styles.add, { backgroundColor: c.primary }]}><Plus size={18} color={c.onPrimary} /></Pressable></View>
+    <View style={styles.tabs}>{(['List', 'Kanban', 'Calendar'] as const).map(value => <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: view === value }} aria-selected={view === value} onPress={() => setView(value)} style={[styles.tab, { backgroundColor: view === value ? c.primary : c.soft }]}><Text style={[styles.tabText, view === value && styles.bold, { color: view === value ? c.onPrimary : c.secondary }]}>{value}</Text></Pressable>)}</View>
+    {view === 'List' && <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>{['Today', 'This Week', 'All'].map(value => <Pressable key={value} accessibilityRole="tab" aria-selected={filter === value} accessibilityState={{ selected: filter === value }} onPress={() => setFilter(value)} style={[styles.chip, { backgroundColor: filter === value ? c.selected : c.chip, borderColor: filter === value ? c.primary : c.border }]}><Text style={[styles.chipText, filter === value && styles.bold, { color: filter === value ? c.primary : c.secondary }]}>{value}</Text></Pressable>)}</ScrollView></View>}
+    {update.isError && <Text accessibilityRole="alert" style={styles.error}>{errorMessage(update.error)}</Text>}
+    {tasks.isPending ? <Skeletons /> : tasks.isError ? <View style={styles.empty}><Text accessibilityRole="alert" style={styles.error}>{errorMessage(tasks.error)}</Text><Pressable accessibilityRole="button" onPress={() => tasks.refetch()} style={styles.back}><Text style={{ color: c.primary }}>Retry</Text></Pressable></View> : view === 'List' ? <SectionList sections={sections} keyExtractor={item => item.id} showsVerticalScrollIndicator={false} stickySectionHeadersEnabled={false} contentContainerStyle={styles.list} ListEmptyComponent={<EmptyTasks />} renderSectionHeader={({ section }) => <Text style={[styles.dateHeader, { color: c.secondary }]}>{dateTitle(section.title)}</Text>} renderItem={({ item }) => <TaskItem task={item} busy={update.isPending} onToggle={() => toggle(item)} />} /> : view === 'Kanban' ?
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.boardScroll} contentContainerStyle={styles.board}>{columns.map(column => { const records = items.filter(task => column.statuses.includes(task.status)); return <View key={column.title} style={[styles.column, { backgroundColor: c.column }]}><View style={styles.columnHeader}><Text style={[styles.columnTitle, { color: c.text }]}>{column.title}</Text><Text style={[styles.count, { backgroundColor: c.soft, color: c.secondary }]}>{records.length}</Text></View><ScrollView showsVerticalScrollIndicator={false} style={styles.columnScroll} contentContainerStyle={styles.columnContent}>{records.map(task => <View key={task.id} style={[styles.kanbanCard, { backgroundColor: c.card, borderColor: c.border }]}><Pressable accessibilityRole="checkbox" accessibilityLabel={`Complete ${task.title}`} accessibilityState={{ checked: isDone(task), disabled: update.isPending }} aria-checked={isDone(task)} disabled={update.isPending} onPress={() => toggle(task)} style={styles.kanbanToggle}><Text style={[styles.taskTitle, isDone(task) && styles.done, { color: c.text }]}>{isDone(task) ? '\u2713 ' : ''}{task.title}</Text></Pressable><View style={styles.kanbanMeta}><Badges task={task} /><View style={[styles.moduleDot, { backgroundColor: task.project_id ? '#D97706' : task.goal_id ? '#2D6A4F' : '#2563EB' }]} /></View>{['todo', 'pending'].includes(task.status) && <Pressable accessibilityRole="button" disabled={update.isPending} onPress={() => update.mutate({ id: task.id, status: 'in_progress' })} style={styles.start}><Text style={[styles.chipText, { color: c.primary }]}>Start task</Text></Pressable>}</View>)}<Pressable accessibilityRole="button" onPress={add} style={styles.columnAdd}><Plus size={14} color={c.muted} /><Text style={[styles.columnAddText, { color: c.muted }]}>Add task</Text></Pressable></ScrollView></View>; })}</ScrollView> :
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}><View style={styles.calendarHeader}><Pressable accessibilityRole="button" accessibilityLabel="Previous month" onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} style={styles.back}><ChevronLeft color={c.text} size={22} /></Pressable><Text style={[styles.columnTitle, { color: c.text }]}>{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text><Pressable accessibilityRole="button" accessibilityLabel="Next month" onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} style={styles.back}><ChevronRight color={c.text} size={22} /></Pressable></View><View style={styles.calendar}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label, index) => <Text key={`weekday-${index}`} style={[styles.weekday, { color: c.secondary }]}>{label}</Text>)}{Array.from({ length: offset + days }, (_, index) => { const day = index - offset + 1; const key = dayKey(new Date(month.getFullYear(), month.getMonth(), day)); return day < 1 ? <View key={index} style={styles.calendarDay} /> : <Pressable key={index} accessibilityRole="button" accessibilityLabel={key} accessibilityState={{ selected: selectedDay === key }} onPress={() => setSelectedDay(key)} style={[styles.calendarDay, selectedDay === key && { backgroundColor: c.primary }]}><Text style={{ color: selectedDay === key ? c.onPrimary : c.text }}>{day}</Text>{items.some(task => taskDay(task) === key) && <View style={[styles.moduleDot, { backgroundColor: selectedDay === key ? c.onPrimary : c.primary }]} />}</Pressable>; })}</View><Text style={[styles.dateHeader, { color: c.secondary }]}>{dateTitle(selectedDay)}</Text>{items.filter(task => taskDay(task) === selectedDay).length ? items.filter(task => taskDay(task) === selectedDay).map(task => <TaskItem key={task.id} task={task} busy={update.isPending} onToggle={() => toggle(task)} />) : <EmptyTasks />}</ScrollView>}
+    <Pressable accessibilityRole="button" accessibilityLabel="Create task" onPress={add} style={[styles.fab, { backgroundColor: c.primary }]}><Plus size={24} color={c.onPrimary} /></Pressable>
+  </SafeAreaView>;
+}
+const styles = StyleSheet.create({
+  screen: { flex: 1 }, header: { paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }, heading: { fontSize: 20, fontWeight: '700' }, add: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, tabs: { marginTop: 16, paddingHorizontal: 20, flexDirection: 'row', gap: 8 }, tab: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, minHeight: 44, justifyContent: 'center' }, tabText: { fontSize: 14 }, bold: { fontWeight: '700' }, chips: { marginTop: 12, paddingHorizontal: 20 }, chip: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, borderWidth: 1, marginRight: 8, minHeight: 36, justifyContent: 'center' }, chipText: { fontSize: 13 }, list: { flexGrow: 1, paddingBottom: FAB_CLEARANCE }, dateHeader: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 20, marginBottom: 10, paddingHorizontal: 20 },
+  task: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8, marginHorizontal: 20, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }, checkTouch: { minWidth: 34, minHeight: 44, justifyContent: 'center' }, checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' }, taskContent: { flex: 1 }, taskTitle: { fontSize: 14, fontWeight: '600' }, done: { textDecorationLine: 'line-through' }, badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }, badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, fontSize: 11, fontWeight: '600' }, time: { fontSize: 11, marginLeft: 8 },
+  boardScroll: { flex: 1 }, board: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 16 }, column: { width: 260, marginRight: 16, borderRadius: 16, padding: 12 }, columnScroll: { flex: 1 }, columnContent: { paddingBottom: FAB_CLEARANCE }, columnHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }, columnTitle: { fontSize: 14, fontWeight: '700' }, count: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, fontSize: 12 }, kanbanCard: { borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, shadowOpacity: 0.04, elevation: 1 }, kanbanToggle: { minHeight: 44, justifyContent: 'center', marginBottom: 8 }, kanbanMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, moduleDot: { width: 8, height: 8, borderRadius: 4 }, start: { minHeight: 44, justifyContent: 'center' }, columnAdd: { flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingVertical: 8, minHeight: 44 }, columnAddText: { fontSize: 13, marginLeft: 4 }, fab: { position: 'absolute', bottom: FAB_GAP, right: 20, width: FAB_SIZE, height: FAB_SIZE, borderRadius: FAB_SIZE / 2, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 }, empty: { padding: 32, alignItems: 'center', justifyContent: 'center', flex: 1 }, emptyTitle: { fontSize: 16, fontWeight: '600', marginTop: 12 }, emptyDetail: { fontSize: 13, marginTop: 4 }, skeleton: { height: 80, borderRadius: 14, marginHorizontal: 20, marginTop: 12 }, error: { color: '#EF4444', padding: 16 }, calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 20, marginTop: 16 }, calendar: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: 20 }, weekday: { width: '14.2857%', textAlign: 'center', paddingVertical: 10 }, calendarDay: { width: '14.2857%', minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', gap: 4 },
+});
